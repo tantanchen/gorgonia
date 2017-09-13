@@ -30,7 +30,7 @@ type lispMachine struct {
 	// logging stuff
 	watchlist Nodes
 	logger    *log.Logger
-	buf       *bytes.Buffer
+	buf       bytes.Buffer
 	valueFmt  string
 	tabcount  int
 	logFlags  byte

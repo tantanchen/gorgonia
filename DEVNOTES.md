@@ -22,6 +22,13 @@ Cgo is used pretty heavily in Gorgonia. Here are some Cgo guidelines that I've c
 	}
 	```
 
-#Go Assembly#
+# Go Assembly #
 
 When writing Go Assembly, use [asmfmt](https://github.com/klauspost/asmfmt)
+
+# Memory Handling and Performance #
+
+Here's a checklist of things to do when doing work on Gorgonia:
+
+* [ ] Were there any changes in the benchmarks? Use `benchcmp`
+* [ ] Was an escape analysis done to minimize escapes and unnecessary leaking params?

@@ -1,7 +1,6 @@
 package gorgonia
 
 import (
-	"bytes"
 	"log"
 	"os"
 )
@@ -45,10 +44,8 @@ func WithLogger(logger *log.Logger) VMOpt {
 		switch v := m.(type) {
 		case *lispMachine:
 			v.logger = logger
-			v.buf = new(bytes.Buffer)
 		case *tapeMachine:
 			v.logger = logger
-			v.buf = new(bytes.Buffer)
 		default:
 			panic(nyi("WithLogger", v))
 		}
