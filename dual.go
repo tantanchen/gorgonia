@@ -3,9 +3,9 @@ package gorgonia
 import (
 	"fmt"
 
-	"github.com/chewxy/gorgonia/tensor"
 	"github.com/chewxy/hm"
 	"github.com/pkg/errors"
+	"gorgonia.org/tensor"
 )
 
 type dualValue struct {
@@ -72,11 +72,13 @@ func (dv *dualValue) String() string {
 func (dv *dualValue) sanity() error {
 	// check that d and v are the same type
 
-	dvv := TypeOf(dv.Value)
-	dvd := TypeOf(dv.d)
+	dvv := typeCheckTypeOf(dv.Value)
+	dvd := typeCheckTypeOf(dv.d)
 	if !dvv.Eq(dvd) {
 		return errors.Errorf("DualValues do not have the same types: %v and %v", dvv, dvd)
 	}
+	ReturnType(dvv)
+	ReturnType(dvd)
 
 	// TODO: check that the shapes are the same
 

@@ -6,10 +6,10 @@ import (
 	"hash/fnv"
 	"time"
 
-	"github.com/chewxy/gorgonia/tensor"
 	"github.com/chewxy/hm"
 	"github.com/leesper/go_rng"
 	"github.com/pkg/errors"
+	"gorgonia.org/tensor"
 )
 
 /*
@@ -55,7 +55,7 @@ func (op randomOp) Type() hm.Type {
 	if op.shape.IsScalar() {
 		return op.dt
 	}
-	tt := newTensorType(op.shape.Dims(), op.dt)
+	tt := makeTensorType(op.shape.Dims(), op.dt)
 	return tt
 }
 
