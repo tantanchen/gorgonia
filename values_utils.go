@@ -127,7 +127,6 @@ func CloneValue(v Value) (Value, error) {
 	default:
 		return nil, errors.Errorf("Unable to clone value of type %T", v)
 	}
-
 }
 
 // ZeroValue returns the zero value of a type
@@ -234,5 +233,15 @@ func Copy(dest, src Value) (Value, error) {
 			return dest, err
 		}
 		return nil, errors.Errorf("Unable to copy value of type %T into value of type %T", src, dest)
+	}
+}
+
+func setEngine(v Value, e tensor.Engine) {
+	switch vv := v.(type) {
+	case *dualValue:
+		setEngine(vv.Value, e)
+		setEngine(vv.d, e)
+	case tensor.Tensor:
+		tensor.WithEngine(e)(vv)
 	}
 }

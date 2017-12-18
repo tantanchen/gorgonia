@@ -1,7 +1,7 @@
-# Gorgonia [![GoDoc](https://godoc.org/github.com/chewxy/gorgonia?status.svg)](https://godoc.org/github.com/chewxy/gorgonia) [![Build Status](https://travis-ci.org/chewxy/gorgonia.svg?branch=master)](https://travis-ci.org/chewxy/gorgonia) [![Coverage Status](https://coveralls.io/repos/github/chewxy/gorgonia/badge.svg?branch=master)](https://coveralls.io/github/chewxy/gorgonia?branch=master) [![Go Report Card](https://goreportcard.com/badge/github.com/chewxy/gorgonia)](https://goreportcard.com/report/github.com/chewxy/gorgonia) [![unstable](http://badges.github.io/stability-badges/dist/unstable.svg)](http://github.com/badges/stability-badges)
+# Gorgonia [![GoDoc](https://godoc.org/gorgonia.org/gorgonia?status.svg)](https://godoc.org/gorgonia.org/gorgonia) [![GitHub version](https://badge.fury.io/gh/gorgonia%2Fgorgonia.svg)](https://badge.fury.io/gh/gorgonia%2Fgorgonia) [![Build Status](https://travis-ci.org/gorgonia/gorgonia.svg?branch=master)](https://travis-ci.org/gorgonia/gorgonia) [![Coverage Status](https://coveralls.io/repos/github/gorgonia/gorgonia/badge.svg?branch=master)](https://coveralls.io/github/gorgonia/gorgonia?branch=master) [![Go Report Card](https://goreportcard.com/badge/gorgonia.org/gorgonia)](https://goreportcard.com/report/gorgonia.org/gorgonia) [![unstable](http://badges.github.io/stability-badges/dist/unstable.svg)](http://github.com/badges/stability-badges)
 #
 
-<img src="https://raw.githubusercontent.com/chewxy/gorgonia/master/media/mascot_small.jpg" align="right" />
+<img src="https://raw.githubusercontent.com/gorgonia/gorgonia/master/media/mascot_small.jpg" align="right" />
 
 Gorgonia is a library that helps facilitate machine learning in Go. Write and evaluate mathematical equations involving multidimensional arrays easily. If this sounds like [Theano](http://deeplearning.net/software/theano/) or [TensorFlow](https://www.tensorflow.org/), it's because the idea is quite similar. Specifically, the library is pretty low-level, like Theano, but has higher goals like Tensorflow.
 
@@ -28,24 +28,42 @@ Gorgonia aims to do the same, but for the Go environment. Gorgonia is currently 
 
 # Installation #
 
-The package is go-gettable: `go get -u github.com/chewxy/gorgonia`. Additionally, Gorgonia uses [dep](https://github.com/golang/dep) as its vendoring tool.
+The package is go-gettable: `go get -u gorgonia.org/gorgonia`. Additionally, Gorgonia uses [dep](https://github.com/golang/dep) as its vendoring tool.
 
-These are the list of external packages that Gorgonia uses, ranked in order of reliance that this package has (subpackages are omitted) (please see the [Gopkg.toml file](https://github.com/chewxy/gorgonia/blob/master/Gopkg.toml) for a more detailed view on the constraints that Gorgonia uses):
+The current version is 0.8.x
+
+
+## Versioning ## 
+
+We use [semver 2.0.0](http://semver.org/) for our versioning. Before 1.0, Gorgonia's APIs are expected to change quite a bit. API is defined by the exported functions, variables and methods. For the developers' sanity, there are minor differences to semver that we will apply prior to version 1.0. They are enumerated below:
+
+* The MINOR number will be incremented every time there is a deletrious break in API. This means any deletion, or any change in function signature or interface methods will lead to a change in MINOR number. 
+* Additive changes will NOT change the MINOR version number prior to version 1.0. This means that if new functionality were added that does not break the way you use Gorgonia, there will not be an increment in the MINOR version. There will be an increment in the PATCH version.  
+
+## Go Version Support ##
+
+Gorgonia aims to support 5 versions below the Master branch of Go. This means Gorgonia will support the current released version of Go, and up to 4 previous versions - providing something doesn't break. Where possible a shim will be provided (for things like new `sort` APIs or `math/bits` which came out in Go 1.9).
+
+The current version of Go is 1.9.2. The earliest version Gorgonia supports is Go 1.6.x. 
+
+## Dependencies ##
+
+There are very few dependencies that Gorgonia uses - and they're all pretty stable, so as of now there isn't a need for vendoring tools. These are the list of external packages that Gorgonia calls, ranked in order of reliance that this package has (subpackages are omitted):
 
 |Package|Used For|Vitality|Notes|Licence|
 |-------|--------|--------|-----|-------|
 |[gonum/graph](https://github.com/gonum/gonum/tree/master/graph)| Sorting `*ExprGraph`| Vital. Removal means Gorgonia will not work | Development of Gorgonia is committed to keeping up with the most updated version|[gonum license](https://github.com/gonum/license) (MIT/BSD-like)|
 |[gonum/blas](https://github.com/gonum/gonum/tree/master/blas)|Tensor subpackage linear algebra operations|Vital. Removal means Gorgonial will not work|Development of Gorgonia is committed to keeping up with the most updated version|[gonum license](https://github.com/gonum/license) (MIT/BSD-like)|
-|[cu](https://github.com/chewxy/cu)| CUDA drivers | Needed for CUDA operations | Same maintainer as Gorgonia | MIT/BSD-like|
+|[cu](https://gorgonia.org/cu)| CUDA drivers | Needed for CUDA operations | Same maintainer as Gorgonia | MIT/BSD-like|
 |[math32](https://github.com/chewxy/math32)|`float32` operations|Can be replaced by `float32(math.XXX(float64(x)))`|Same maintainer as Gorgonia, same API as the built in `math` package|MIT/BSD-like|
 |[hm](https://github.com/chewxy/hm)|Type system for Gorgonia|Gorgonia's graphs are pretty tightly coupled with the type system | Same maintainer as Gorgonia | MIT/BSD-like|
-|[vecf64](https://github.com/chewxy/vecf64)| optimized `[]float64` operations | Can be generated in the `tensor/genlib` package. However, plenty of optimizations have been made/will be made | Same maintainer as Gorgonia | MIT/BSD-like|
-|[vecf32](https://github.com/chewxy/vecf32)| optimized `[]float32` operations | Can be generated in the `tensor/genlib` package. However, plenty of optimizations have been made/will be made | Same maintainer as Gorgonia | MIT/BSD-like|
+|[vecf64](https://gorgonia.org/vecf64)| optimized `[]float64` operations | Can be generated in the `tensor/genlib` package. However, plenty of optimizations have been made/will be made | Same maintainer as Gorgonia | MIT/BSD-like|
+|[vecf32](https://gorgonia.org/vecf32)| optimized `[]float32` operations | Can be generated in the `tensor/genlib` package. However, plenty of optimizations have been made/will be made | Same maintainer as Gorgonia | MIT/BSD-like|
 |[set](https://github.com/xtgo/set)|Various set operations|Can be easily replaced|Stable API for the past 1 year|[set licence](https://github.com/xtgo/set/blob/master/LICENSE) (MIT/BSD-like)|
 |[gographviz](https://github.com/awalterschulze/gographviz)|Used for printing graphs|Graph printing is only vital to debugging. Gorgonia can survive without, but with a major (but arguably nonvital) feature loss|Last update 12th April 2017|[gographviz licence](https://github.com/awalterschulze/gographviz/blob/master/LICENSE) (Apache 2.0)|
 |[rng](https://github.com/leesper/go_rng)|Used to implement helper functions to generate initial weights|Can be replaced fairly easily. Gorgonia can do without the convenience functions too||[rng licence](https://github.com/leesper/go_rng/blob/master/LICENSE) (Apache 2.0)|
 |[errors](https://github.com/pkg/errors)|Error wrapping|Gorgonia won't die without it. In fact Gorgonia has also used [goerrors/errors](https://github.com/go-errors/errors) in the past.|Stable API for the past 6 months|[errors licence](https://github.com/pkg/errors/blob/master/LICENSE) (MIT/BSD-like)|
-|[gonum/mat](http://github.com/gonum/gonum)|Compatibility between `Tensor` and Gonum's Matrix|Development of Gorgonia is committed to keeping up with the most updated version|[gonum license](https://github.com/gonum/license) (MIT/BSD-like)|
+|[gonum/mat](http://github.com/gonum/gonum)|Compatibility between `Tensor` and Gonum's Matrix|Development of Gorgonia is committed to keeping up with the most updated version||[gonum license](https://github.com/gonum/license) (MIT/BSD-like)|
 |[testify/assert](https://github.com/stretchr/testify)|Testing|Can do without but will be a massive pain in the ass to test||[testify licence](https://github.com/stretchr/testify/blob/master/LICENSE) (MIT/BSD-like)|
 
 # Keeping Updated #
@@ -69,7 +87,7 @@ import (
 	"fmt"
 	"log"
 
-	. "github.com/chewxy/gorgonia"
+	. "gorgonia.org/gorgonia"
 )
 
 func main() {
@@ -135,7 +153,7 @@ import (
 	"fmt"
 	"log"
 
-	. "github.com/chewxy/gorgonia"
+	. "gorgonia.org/gorgonia"
 )
 
 func main() {
@@ -192,7 +210,7 @@ import (
 	"fmt"
 	"log"
 
-	. "github.com/chewxy/gorgonia"
+	. "gorgonia.org/gorgonia"
 )
 
 func main() {
@@ -254,11 +272,11 @@ Currently Gorgonia only performs backwards mode automatic differentiation (aka b
 
 A lot has been said about a computation graph or an expression graph. But what is it exactly? Think of it as an AST for the math expression that you want. Here's the graph for the examples (but with a vector and a scalar addition instead) above:
 
-![graph1](https://raw.githubusercontent.com/chewxy/gorgonia/master/media/exprGraph_example1.png)
+![graph1](https://raw.githubusercontent.com/gorgonia/gorgonia/master/media/exprGraph_example1.png)
 
 By the way, Gorgonia comes with nice-ish graph printing abilities. Here's an example of a graph of the equation `y = x²` and its derivation:
 
-![graph1](https://raw.githubusercontent.com/chewxy/gorgonia/master/media/exprGraph_example2.png)
+![graph1](https://raw.githubusercontent.com/gorgonia/gorgonia/master/media/exprGraph_example2.png)
 
 To read the graph is easy. The expression builds from bottom up, while the derivations build from top down. This way the derivative of each node is roughly on the same level. 
 
@@ -294,11 +312,13 @@ go build -tags='cuda' .
 
 Furthermore, there are some additional requirements:
 
-1. [CUDA toolkit 8.0](https://developer.nvidia.com/cuda-toolkit) is required. Installing this installs the `nvcc` compiler which is required to run your code with CUDA
-2. `go install github.com/chewxy/gorgonia/cmd/cudagen`. This installs the `cudagen` program. Running `cudagen` will generate the relevant CUDA related code for Gorgonia.
+1. [CUDA toolkit 9.0](https://developer.nvidia.com/cuda-toolkit) is required. Installing this installs the `nvcc` compiler which is required to run your code with CUDA.
+2. Be sure to follow the [post-installation steps](http://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#post-installation-actions)
+2. `go install gorgonia.org/gorgonia/cmd/cudagen`. This installs the `cudagen` program. Running `cudagen` will generate the relevant CUDA related code for Gorgonia.
 3. The CUDA ops must be manually enabled in your code with the `UseCudaFor` option.
 4. `runtime.LockOSThread()` must be called in the main function where the VM is running. CUDA requires thread affinity, and therefore the OS thread must be locked.
 
+Because `nvcc` only plays well with `gcc` version 6 and below (the current version is 7), this is also quite helpful: `sudo ln -s /path/to/gcc-6 /usr/local/cuda-9.0/bin/gcc` 
 
 ### Example ###
 
@@ -310,8 +330,8 @@ import (
 	"log"
 	"runtime"
 
-	T "github.com/chewxy/gorgonia"
-	"github.com/chewxy/gorgonia/tensor"
+	T "gorgonia.org/gorgonia"
+	"gorgonia.org/gorgonia/tensor"
 )
 
 func main() {
@@ -411,7 +431,7 @@ BenchmarkOneMil-8       	      50	  33169036 ns/op
 # API Stability #
 Gorgonia's API is as of right now, not considered stable. It will be stable from version 1.0 forwards.
 
-As we move towards 1.0, the github repository will be moved to the [organization gorgonia](https://github.com/chewxy/gorgonia/issues/98). See the issue for more updates.
+As we move towards 1.0, the github repository will be moved to the [organization gorgonia](https://gorgonia.org/gorgonia/issues/98). See the issue for more updates.
 
 # Roadmap #
 
@@ -487,3 +507,4 @@ These are the packages and libraries which inspired and were adapted from in the
 |------|---|-------|
 | Numpy  | Inspired large portions. Directly adapted algorithms for a few methods (explicitly labelled in the docs) | MIT/BSD-like. [Numpy Licence](https://github.com/numpy/numpy/blob/master/LICENSE.txt) |
 | Theano | Inspired large portions. (Unsure: number of directly adapted algorithms) | MIT/BSD-like [Theano's licence](http://deeplearning.net/software/theano/LICENSE.html) |
+| Caffe | `im2col` and `col2im` directly taken from Caffe. Convolution algorithms inspired by the original Caffee methods | [Caffe Licence](https://github.com/BVLC/caffe/blob/master/LICENSE)

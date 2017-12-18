@@ -24,7 +24,7 @@ func TestApplyOp(t *testing.T) {
 	t.Logf("g: %v", cpi.g)
 
 	op = newElemBinOp(addOpType, cpi, cpi)
-	added, err := applyOpWithName(op, "+ pi pi", cpi, cpi)
+	added, err := ApplyOpWithName(op, "+ pi pi", cpi, cpi)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,7 +33,7 @@ func TestApplyOp(t *testing.T) {
 
 	ct = NewConstant(tensor.Ones(tensor.Float64, 3, 3)) // no graph set for ct
 	op = newElemBinOp(addOpType, cpi, ct)
-	added, err = applyOpWithName(op, "+ pi constTensor(3,3)_ones", cpi, ct)
+	added, err = ApplyOpWithName(op, "+ pi constTensor(3,3)_ones", cpi, ct)
 	if err != nil {
 		t.Error(err)
 	}
@@ -54,10 +54,7 @@ var mulTests = []struct {
 
 func TestMul(t *testing.T) {
 	defer runtime.GC()
-
 	assert := assert.New(t)
-
-	t.Logf("Testing Mul with TapeMachine")
 	for _, mts := range mulTests {
 		g := NewGraph()
 		x := NewTensor(g, Float64, mts.xshape.Dims(), WithName(mts.name), WithShape(mts.xshape...), WithInit(RangedFrom(0)))
@@ -686,4 +683,209 @@ func TestMean(t *testing.T) {
 	if !m.IsScalar() {
 		t.Error("Expected result to be scalar")
 	}
+}
+
+func TestTensordot(t *testing.T) {
+	assert := assert.New(t)
+
+	// Scalars
+	g := NewGraph()
+
+	a := NewTensor(g, Float64, 1, WithName("a"), WithShape(1), WithInit(RangedFrom(2)))
+	b := NewTensor(g, Float64, 1, WithName("b"), WithShape(1), WithInit(RangedFrom(21)))
+
+	c := NewTensor(g, Float64, 1, WithName("c"), WithShape(1), WithInit(ValuesOf(1.0)))
+
+	tensordot, err := Tensordot([]int{0}, []int{0}, a, b)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dtensordot, err := Backpropagate(Nodes{tensordot}, Nodes{c}, Nodes{a, b})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	m := NewTapeMachine(g)
+	err = m.RunAll()
+
+	if nil != err {
+		t.Fatal(err)
+	}
+
+	correctInt := float64(42)
+	value := tensordot.Value().Data()
+	assert.Equal(correctInt, value)
+
+	dtensordotCorrectInt0 := float64(21)
+	dtensordotCorrectInt1 := float64(2)
+
+	assert.Equal(dtensordotCorrectInt0, dtensordot[0].Value().Data())
+	assert.Equal(dtensordotCorrectInt1, dtensordot[1].Value().Data())
+
+	// Vectors
+
+	g = NewGraph()
+	a = NewTensor(g, Float64, 1, WithName("a"), WithShape(2), WithInit(RangedFrom(1)))
+	b = NewTensor(g, Float64, 1, WithName("b"), WithShape(2), WithInit(RangedFrom(3)))
+
+	c = NewTensor(g, Float64, 1, WithName("c"), WithShape(1), WithInit(ValuesOf(1.0)))
+
+	tensordot, err = Tensordot([]int{0}, []int{0}, a, b)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dtensordot, err = Backpropagate(Nodes{tensordot}, Nodes{c}, Nodes{a, b})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Need to multiply dtensordot with identiy matrix, otherwise the transpose action in symdiff is not performed
+	id := NewConstant(tensor.I(Float64, 2, 2, 0))
+
+	dtensordot0 := Must(Mul(id, dtensordot[0]))
+	dtensordot1 := Must(Mul(id, dtensordot[1]))
+
+	m = NewTapeMachine(g)
+	err = m.RunAll()
+
+	if nil != err {
+		t.Fatal(err)
+	}
+
+	correctInt = float64(11)
+	assert.Equal(correctInt, tensordot.Value().Data())
+
+	dcorrect0 := []float64{3, 4}
+	dcorrect1 := []float64{1, 2}
+
+	assert.Equal(dcorrect0, extractF64s(dtensordot[0].Value()))
+	assert.Equal(dcorrect1, extractF64s(dtensordot[1].Value()))
+
+	// Vector and Matrix
+	g = NewGraph()
+	a = NewTensor(g, Float64, 2, WithName("a"), WithShape(2, 2), WithInit(RangedFrom(0)))
+	b = NewTensor(g, Float64, 1, WithName("b"), WithShape(2), WithInit(RangedFrom(0)))
+
+	c = NewTensor(g, Float64, 1, WithName("c"), WithShape(2), WithInit(ValuesOf(1.0)))
+
+	tensordot, err = Tensordot([]int{1}, []int{0}, a, b)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dtensordot, err = Backpropagate(Nodes{tensordot}, Nodes{c}, Nodes{a, b})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Need to multiply dtensordot with identiy matrix, otherwise the transpose action in symdiff is not performed
+	id = NewConstant(tensor.I(Float64, 2, 2, 0))
+
+	dtensordot0, err = Mul(id, dtensordot[0])
+	dtensordot1, err = Mul(id, dtensordot[1])
+
+	m = NewTapeMachine(g)
+	err = m.RunAll()
+
+	if nil != err {
+		t.Fatal(err)
+	}
+
+	correct := []float64{1, 3}
+	assert.Equal(correct, extractF64s(tensordot.Value()))
+
+	dcorrect0 = []float64{0, 1, 0, 1}
+	dcorrect1 = []float64{2, 4}
+
+	assert.Equal(dcorrect0, extractF64s(dtensordot0.Value()))
+	assert.Equal(dcorrect1, extractF64s(dtensordot1.Value()))
+
+	// Matrices
+	g = NewGraph()
+
+	a = NewTensor(g, Float64, 2, WithName("a"), WithShape(2, 2), WithInit(RangedFrom(0)))
+	b = NewTensor(g, Float64, 2, WithName("b"), WithShape(2, 2), WithInit(RangedFrom(0)))
+
+	c = NewTensor(g, Float64, 2, WithName("c"), WithShape(2, 2), WithInit(ValuesOf(1.0)))
+
+	tensordot, err = Tensordot([]int{1}, []int{1}, a, b)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dtensordot, err = Backpropagate(Nodes{tensordot}, Nodes{c}, Nodes{a, b})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Need to multiply dtensordot with identiy matrix, otherwise the transpose action in symdiff is not performed
+	id = NewConstant(tensor.I(Float64, 2, 2, 0))
+
+	dtensordot0, err = Mul(id, dtensordot[0])
+	dtensordot1, err = Mul(id, dtensordot[1])
+
+	m = NewTapeMachine(g)
+	err = m.RunAll()
+
+	if nil != err {
+		t.Fatal(err)
+	}
+
+	correct = []float64{1, 3, 3, 13}
+	assert.Equal(correct, extractF64s(tensordot.Value()))
+
+	dcorrect := []float64{2, 4, 2, 4}
+	assert.Equal(dcorrect, extractF64s(dtensordot0.Value()))
+	assert.Equal(dcorrect, extractF64s(dtensordot1.Value()))
+
+	// Total matrix contraction
+	g = NewGraph()
+
+	a = NewTensor(g, Float64, 2, WithName("a"), WithShape(2, 2), WithInit(RangedFrom(0)))
+	b = NewTensor(g, Float64, 2, WithName("b"), WithShape(2, 2), WithInit(RangedFrom(0)))
+
+	c = NewTensor(g, Float64, 1, WithName("c"), WithShape(1), WithInit(ValuesOf(1.0)))
+
+	tensordot, err = Tensordot([]int{0, 1}, []int{0, 1}, a, b)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dtensordot, err = Backpropagate(Nodes{tensordot}, Nodes{c}, Nodes{a, b})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Need to multiply dtensordot with identiy matrix, otherwise the transpose action in symdiff is not performed
+	id = NewConstant(tensor.I(Float64, 2, 2, 0))
+
+	dtensordot0, err = Mul(id, dtensordot[0])
+	dtensordot1, err = Mul(id, dtensordot[1])
+
+	m = NewTapeMachine(g)
+	err = m.RunAll()
+
+	if nil != err {
+		t.Fatal(err)
+	}
+
+	correctInt = float64(14)
+	assert.Equal(correctInt, tensordot.Value().Data())
+
+	dcorrect = []float64{0, 1, 2, 3}
+	assert.Equal(dcorrect, extractF64s(dtensordot0.Value()))
+	assert.Equal(dcorrect, extractF64s(dtensordot1.Value()))
+
 }

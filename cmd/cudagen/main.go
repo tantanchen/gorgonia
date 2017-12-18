@@ -13,7 +13,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/chewxy/cu"
+	"gorgonia.org/cu"
 )
 
 var debug = flag.Bool("debug", false, "compile with debug mode (-linelinfo is added to nvcc call)")
@@ -43,7 +43,7 @@ func compileCUDA(src, targetLoc string, maj, min int) {
 
 	slow.Stderr = &stderr
 	if err := slow.Run(); err != nil {
-		log.Fatalf("Failed to compile with nvcc: %v.", stderr.String())
+		log.Fatalf("Failed to compile with nvcc. Error: %v. nvcc error: %v", err, stderr.String())
 	}
 
 	// fast := exec.Command("nvcc", output, arch, "-ptx", "-Xptxas", "-allow-expensive-optimizations", "-fmad=false", "-use_fast_math", src)
@@ -90,7 +90,7 @@ func main() {
 	}
 
 	gopath := os.Getenv("GOPATH")
-	gorgoniaLoc := path.Join(gopath, "src/github.com/chewxy/gorgonia")
+	gorgoniaLoc := path.Join(gopath, "src/gorgonia.org/gorgonia")
 	cuLoc := path.Join(gorgoniaLoc, "cuda modules/src")
 	ptxLoc := path.Join(gorgoniaLoc, "cuda modules/target")
 
