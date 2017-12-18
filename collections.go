@@ -8,6 +8,8 @@ import (
 	"github.com/xtgo/set"
 )
 
+type NodeIDs []NodeID
+
 // Nodes is a slice of nodes, but it also acts as a set of nodes by implementing the Sort interface
 type Nodes []*Node
 

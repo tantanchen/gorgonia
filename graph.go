@@ -13,15 +13,16 @@ import (
 type ExprGraph struct {
 	name string
 
+	// all is the lookup table for all nodes. It's the only thing that the GC needs to scan
 	all Nodes
 
-	byHash map[uint32]*Node
-	evac   map[uint32]Nodes
-	to     map[*Node]Nodes
+	byHash map[uint32]NodeID
+	evac   map[uint32]NodeIDs
+	to     map[NodeID]NodeIDs
 
-	leaves    Nodes
-	constants Nodes
-	roots     Nodes
+	leaves    NodeIDs
+	constants NodeIDs
+	roots     NodeIDs
 	counter   uint
 }
 
@@ -38,12 +39,12 @@ func WithGraphName(name string) graphconopt {
 // NewGraph creates a new graph. Duh
 func NewGraph(opts ...graphconopt) *ExprGraph {
 	g := &ExprGraph{
-		byHash: make(map[uint32]*Node),
-		evac:   make(map[uint32]Nodes),
-		to:     make(map[*Node]Nodes),
+		byHash: make(map[uint32]NodeID),
+		evac:   make(map[uint32]NodeIDs),
+		to:     make(map[NodeID]NodeIDs),
 
-		leaves:    make(Nodes, 0, 64),
-		constants: make(Nodes, 0, 8),
+		leaves:    make(NodeIDs, 0, 64),
+		constants: make(NodeIDs, 0, 8),
 	}
 
 	for _, opt := range opts {
@@ -72,56 +73,66 @@ func (g *ExprGraph) Clone() interface{} {
 	// handle each node's children, deriv ofs, etc
 	for i, n := range g.all {
 		cloned := g2.all[i]
-		cloned.children = make(Nodes, len(n.children))
-		for j, c := range n.children {
-			cloned.children[j] = mapping[c]
+		cloned.children = make(NodeIDs, len(n.children))
+		for j, cid := range n.children {
+			c := g.Node(cid)
+			cloned.children[j] = mapping[c].id
 		}
 
-		cloned.derivOf = make(Nodes, len(n.derivOf))
-		for j, c := range n.derivOf {
-			cloned.derivOf[j] = mapping[c]
+		cloned.derivOf = make(NodeIDs, len(n.derivOf))
+		for j, cid := range n.derivOf {
+			c := g.Node(cid)
+			cloned.derivOf[j] = mapping[c].id
 		}
 
-		if n.deriv != nil {
-			cloned.deriv = mapping[n.deriv]
+		if n.deriv != -1 {
+			deriv := g.Node(n.deriv)
+			cloned.deriv = mapping[deriv].id
 		}
 	}
 
-	g2.byHash = make(map[uint32]*Node)
-	for k, v := range g.byHash {
-		g2.byHash[k] = mapping[v]
+	g2.byHash = make(map[uint32]NodeID)
+	for k, vid := range g.byHash {
+		v := g.Node(vid)
+		g2.byHash[k] = mapping[v].id
 	}
 
-	g2.evac = make(map[uint32]Nodes)
+	g2.evac = make(map[uint32]NodeIDs)
 	for k, v := range g.evac {
-		g2.evac[k] = make(Nodes, len(v))
-		for i, n := range v {
-			g2.evac[k][i] = mapping[n]
+		g2.evac[k] = make(NodeIDs, len(v))
+		for i, nid := range v {
+			n := g.Node(nid)
+			g2.evac[k][i] = mapping[n].id
 		}
 	}
 
-	g2.to = make(map[*Node]Nodes)
-	for k, v := range g.to {
+	g2.to = make(map[NodeID]NodeIDs)
+	for kid, v := range g.to {
+		k := g.Node(kid)
 		to := mapping[k]
-		g2.to[to] = make(Nodes, len(v))
-		for i, n := range v {
-			g2.to[to][i] = mapping[n]
+		g2.to[to.id] = make(NodeIDs, len(v))
+		for i, nid := range v {
+			n := g.Node(nid)
+			g2.to[to.id][i] = mapping[n].id
 		}
 	}
 
-	g2.leaves = make(Nodes, len(g.leaves))
-	for i, n := range g.leaves {
-		g2.leaves[i] = mapping[n]
+	g2.leaves = make(NodeIDs, len(g.leaves))
+	for i, nid := range g.leaves {
+		n := g.Node(nid)
+		g2.leaves[i] = mapping[n].id
 	}
 
-	g2.constants = make(Nodes, len(g.constants))
-	for i, n := range g.constants {
-		g2.constants[i] = mapping[n]
+	g2.constants = make(NodeIDs, len(g.constants))
+	for i, nid := range g.constants {
+		n := g.Node(nid)
+		g2.constants[i] = mapping[n].id
 	}
 
-	g2.roots = make(Nodes, len(g.roots))
-	for i, n := range g.roots {
-		g2.roots[i] = mapping[n]
+	g2.roots = make(NodeIDs, len(g.roots))
+	for i, nid := range g.roots {
+		n := g.Node(nid)
+		g2.roots[i] = mapping[n].id
 	}
 
 	g2.counter = g.counter
@@ -131,14 +142,14 @@ func (g *ExprGraph) Clone() interface{} {
 // AddNode adds n to the graph. It panics if the added node ID matches an existing node ID.
 func (g *ExprGraph) AddNode(n *Node) (retVal *Node) {
 	defer func() {
-		if _, ok := g.to[retVal]; !ok {
-			g.to[retVal] = nil
+		if _, ok := g.to[retVal.id]; !ok {
+			g.to[retVal.id] = nil
 		}
 	}()
 
 	hash := n.Hashcode()
 	if existing, ok := g.byHash[hash]; ok {
-		if existing == nil {
+		if existing < 0 {
 			// this means that there has been previous collisions
 			// so look at evac map
 			for _, e := range g.evac[hash] {
@@ -179,7 +190,7 @@ func (g *ExprGraph) addToAll(n *Node) {
 		panic("HELP! trying to add nil")
 	}
 	g.all = append(g.all, n)
-	n.id = int64(g.counter)
+	n.id = NodeID(g.counter)
 	g.counter++
 }
 
@@ -488,14 +499,18 @@ func (g *ExprGraph) removeAllEdgesFrom(n *Node) {
 /* Graph interface */
 
 // Node returns the node in the graph with the given ID.
-func (g *ExprGraph) Node(id int64) graph.Node {
-	// n := (*Node)(unsafe.Pointer(uintptr(id)))
-	for _, n := range g.all {
-		if n.id == id {
-			return n
-		}
+func (g *ExprGraph) Node(id NodeID) *Node {
+	if int(id) >= len(g.all) || id < 0 {
+		return nil
 	}
-	return nil
+	return g.all[int(id)]
+	// n := (*Node)(unsafe.Pointer(uintptr(id)))
+	// for _, n := range g.all {
+	// 	if n.id == id {
+	// 		return n
+	// 	}
+	// }
+
 }
 
 // Has returns whether the node exists within the graph.

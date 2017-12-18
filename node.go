@@ -14,6 +14,8 @@ import (
 	"gorgonia.org/tensor"
 )
 
+type NodeID int64
+
 // A Node is a node in the computation graph
 type Node struct {
 	// metadata of the node
@@ -22,7 +24,7 @@ type Node struct {
 
 	// this node is the result of applying the op to the children
 	op       Op
-	children Nodes // shortcut, instead of having to go through the graph
+	children NodeIDs // shortcut, instead of having to go through the graph
 
 	// For nicely grouping stuff in graphviz.
 	// TODO: Should this be in *Node?
@@ -37,11 +39,11 @@ type Node struct {
 	dataOn  Device // where is the data on
 
 	// to track derivations
-	derivOf Nodes
-	deriv   *Node
+	derivOf NodeIDs
+	deriv   NodeID
 
 	// for hashing nodes
-	id   int64 // id is the ID at which the node is added to the graph
+	id   NodeID // id is the ID at which the node is added to the graph
 	hash uint32
 
 	hashed        bool
@@ -193,6 +195,7 @@ func newNode(opts ...NodeConsOpt) *Node {
 	n := borrowNode()
 	n.dataOn = CPU
 	n.id = -1
+	n.deriv = -1
 
 	for _, opt := range opts {
 		opt(n)
@@ -282,6 +285,14 @@ func (n *Node) IsMatrix() bool {
 
 // Graph returns the graph of the node
 func (n *Node) Graph() *ExprGraph { return n.g }
+
+func (n *Node) Children() Nodes {
+	retVal := make(Nodes, len(n.children))
+	for i, id := range n.children {
+		retVal[i] = n.g.Node(id)
+	}
+	return retVal
+}
 
 // CloneTo clones the node into a new graph. If CloneTo() is called on the same graph as the n, it will return n. The reason this is done is because
 // at any given time, every node  should be unique in the *ExprGraph.
