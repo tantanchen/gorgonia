@@ -30,7 +30,7 @@ func (ns NodeIDs) Contains(want NodeID) bool {
 	return false
 }
 
-func (ns Nodes) index(n NodeID) int {
+func (ns NodeIDs) index(n NodeID) int {
 	for i, node := range ns {
 		if node == n {
 			return i
@@ -42,7 +42,7 @@ func (ns Nodes) index(n NodeID) int {
 func (ns NodeIDs) remove(what NodeID) NodeIDs {
 	for i := ns.index(what); i != -1; i = ns.index(what) {
 		copy(ns[i:], ns[i+1:])
-		ns[len(ns)-1] = nil // to prevent any unwanted references so things can be GC'd away
+		ns[len(ns)-1] = -1
 		ns = ns[:len(ns)-1]
 	}
 
