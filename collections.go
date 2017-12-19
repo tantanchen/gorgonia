@@ -10,6 +10,45 @@ import (
 
 type NodeIDs []NodeID
 
+func (ns NodeIDs) Add(n NodeID) NodeIDs {
+	for _, nid := range ns {
+		if nid == n {
+			return ns
+		}
+	}
+	ns = append(ns, n)
+	return ns
+}
+
+// Contains checks if the wanted node is in the set
+func (ns NodeIDs) Contains(want NodeID) bool {
+	for _, n := range ns {
+		if n == want {
+			return true
+		}
+	}
+	return false
+}
+
+func (ns Nodes) index(n NodeID) int {
+	for i, node := range ns {
+		if node == n {
+			return i
+		}
+	}
+	return -1
+}
+
+func (ns NodeIDs) remove(what NodeID) NodeIDs {
+	for i := ns.index(what); i != -1; i = ns.index(what) {
+		copy(ns[i:], ns[i+1:])
+		ns[len(ns)-1] = nil // to prevent any unwanted references so things can be GC'd away
+		ns = ns[:len(ns)-1]
+	}
+
+	return ns
+}
+
 // Nodes is a slice of nodes, but it also acts as a set of nodes by implementing the Sort interface
 type Nodes []*Node
 
@@ -189,8 +228,6 @@ func (ns Nodes) replace(what, with *Node) Nodes {
 	return ns
 }
 
-var removers = make(map[string]int)
-
 func (ns Nodes) remove(what *Node) Nodes {
 	for i := ns.index(what); i != -1; i = ns.index(what) {
 		copy(ns[i:], ns[i+1:])
@@ -209,6 +246,14 @@ func (ns Nodes) dimSizers() []DimSizer {
 		} else {
 			retVal[i] = n.shape
 		}
+	}
+	return retVal
+}
+
+func (ns Nodes) NodeIDs() NodeIDs {
+	retVal := make(NodeIDs, len(ns))
+	for i := range ns {
+		retVal[i] = ns[i].id
 	}
 	return retVal
 }

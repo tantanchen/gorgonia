@@ -152,36 +152,39 @@ func (g *ExprGraph) AddNode(n *Node) (retVal *Node) {
 		if existing < 0 {
 			// this means that there has been previous collisions
 			// so look at evac map
-			for _, e := range g.evac[hash] {
+			for _, eid := range g.evac[hash] {
+				e := g.Node(eid)
 				if nodeEq(n, e) {
 					return e
 				}
 			}
-			g.evac[hash] = append(g.evac[hash], n)
+			g.evac[hash] = append(g.evac[hash], n.id)
 			g.addToAll(n)
 			incrCC() // collision counter
 			return n
 		}
-
-		if !nodeEq(n, existing) {
-			g.evac[hash] = Nodes{existing, n}
-			g.byHash[hash] = nil // to signal that it's collided
+		existingNode := g.Node(existing)
+		if !nodeEq(n, existingNode) {
+			g.evac[hash] = NodeIDs{existing, n.id}
+			g.byHash[hash] = -1 // to signal that it's collided
 			g.addToAll(n)
 			incrCC()
 			return n
 		}
 		incrEC() // expected collision (they're the same node!)
-		return existing
+		return existingNode
 	}
 
 	if n.isConstant() {
 		n = n.clone()
-		g.constants = g.constants.Add(n)
 		n.g = g
 	}
 
 	g.addToAll(n)
-	g.byHash[hash] = n
+	g.byHash[hash] = n.id
+	if n.isConstant() {
+		g.constants = g.constants.Add(n.id)
+	}
 	return n
 }
 
@@ -205,8 +208,8 @@ func (g *ExprGraph) RemoveNode(node graph.Node) {
 	hash := n.Hashcode()
 
 	delete(g.byHash, hash)
-	delete(g.to, n)
-	g.evac[hash] = g.evac[hash].remove(n)
+	delete(g.to, n.id)
+	g.evac[hash] = g.evac[hash].remove(n.id)
 	g.all = g.all.remove(n)
 }
 
@@ -229,29 +232,34 @@ func (g *ExprGraph) SetEdge(e graph.Edge) {
 	}
 
 	// g.to[to] = g.to[to].Add(from)
-	g.to[to] = append(g.to[to], from)
+	g.to[to.id] = append(g.to[to.id], from.id)
 }
 
 // Roots returns a list of nodes that are not children of any other nodes
 func (g *ExprGraph) Roots() (retVal Nodes) {
 	// handle subgraph
 	if g.roots != nil {
-		return g.roots
+		return g.NodesFromNodeIDs(g.roots)
 	}
 
-	for n, tos := range g.to {
+	for nid, tos := range g.to {
+		n := g.Node(nid)
 		if len(tos) == 0 {
 			retVal = append(retVal, n)
 		}
 		// if the root is a statement (typically a read), and it only has one child
 		if len(n.children) == 1 && n.isStmt {
-			child := n.children[0]
-			if len(g.to[child]) == 1 {
-				retVal = append(retVal, child)
+			childID := n.children[0]
+			if len(g.to[childID]) == 1 {
+				retVal = append(retVal, g.Node(childID))
 			}
 		}
 	}
-	g.roots = retVal
+
+	g.roots = make(NodeIDs, len(retVal))
+	for i, n := range retVal {
+		g.roots[i] = n.id
+	}
 	return retVal
 }
 
@@ -297,7 +305,8 @@ func (g *ExprGraph) ByName(name string) (retVal Nodes) {
 
 // Constant returns a constant that may be found in the graph. If no constant were found, a new one is created instead
 func (g *ExprGraph) Constant(v Value) *Node {
-	for _, n := range g.constants {
+	for _, nid := range g.constants {
+		n := g.Node(nid)
 		if ValueEq(n.Value(), v) {
 			return n
 		}
@@ -310,7 +319,8 @@ func (g *ExprGraph) Constant(v Value) *Node {
 func (g *ExprGraph) String() string {
 	var buf bytes.Buffer
 	buf.WriteString("Graph: [\n")
-	for _, n := range g.byHash {
+	for _, nid := range g.byHash {
+		n := g.Node(nid)
 		fmt.Fprintf(&buf, "\t%d: %s\n", n.Hashcode(), n)
 	}
 	buf.WriteString("]")
@@ -334,14 +344,16 @@ func (g *ExprGraph) ToDot() string {
 	}
 
 	groups := make(map[string]struct{})
-	for h, n := range g.byHash {
-		if n != nil {
+	for h, nid := range g.byHash {
+		n := g.Node(nid)
+		if nid >= 0 {
 			group := n.dotCluster()
 			groups[group] = struct{}{}
 			continue
 		}
 		// other wise it'se a clash of hash
-		for _, n := range g.evac[h] {
+		for _, nid2 := range g.evac[h] {
+			n := g.Node(nid2)
 			group := n.dotCluster()
 			groups[group] = struct{}{}
 
@@ -370,7 +382,8 @@ func (g *ExprGraph) ToDot() string {
 
 	// for _, from := range g.byHash {
 	for _, from := range g.all {
-		for i, child := range from.children {
+		for i, childID := range from.children {
+			child := g.Node(childID)
 			if ok := g.all.Contains(child); !ok {
 				// not in graph, so ignore it...
 				continue
@@ -401,15 +414,17 @@ func (g *ExprGraph) ToDot() string {
 			"weight":     "999",
 		}
 
-		for _, n := range g.byHash {
-			if n == nil {
+		for _, nid := range g.byHash {
+			n := g.Node(nid)
+			if nid < 0 {
 				// collision found... what to do?
 				continue
 			}
 			if n.derivOf != nil {
 				id := fmt.Sprintf("Node_%p", n)
-				for _, derivOf := range n.derivOf {
-					if _, ok := g.to[derivOf]; !ok {
+				for _, derivOfID := range n.derivOf {
+					derivOf := g.Node(derivOfID)
+					if _, ok := g.to[derivOfID]; !ok {
 						continue
 					}
 					ofID := fmt.Sprintf("Node_%p", derivOf)
@@ -492,7 +507,7 @@ func (g *ExprGraph) ToDot() string {
 
 func (g *ExprGraph) removeAllEdgesFrom(n *Node) {
 	for k, ns := range g.to {
-		g.to[k] = ns.remove(n)
+		g.to[k] = ns.remove(n.id)
 	}
 }
 
@@ -504,19 +519,12 @@ func (g *ExprGraph) Node(id NodeID) *Node {
 		return nil
 	}
 	return g.all[int(id)]
-	// n := (*Node)(unsafe.Pointer(uintptr(id)))
-	// for _, n := range g.all {
-	// 	if n.id == id {
-	// 		return n
-	// 	}
-	// }
-
 }
 
 // Has returns whether the node exists within the graph.
 func (g *ExprGraph) Has(node graph.Node) bool {
 	n := node.(*Node)
-	_, ok := g.to[n]
+	_, ok := g.to[n.id]
 	return ok
 }
 
@@ -535,10 +543,18 @@ func (g *ExprGraph) AllNodes() Nodes {
 	return g.all
 }
 
+func (g *ExprGraph) NodesFromNodeIDs(ids NodeIDs) Nodes {
+	retVal := make(Nodes, len(ids))
+	for i, id := range ids {
+		retVal[i] = g.Node(id)
+	}
+	return retVal
+}
+
 // From returns all nodes in g that can be reached directly from n.
 func (g *ExprGraph) From(node graph.Node) []graph.Node {
 	n := node.(*Node)
-	return nodeToGraphNode(n.children)
+	return nodeToGraphNode(g.NodesFromNodeIDs(n.children))
 }
 
 // HasEdgeBetween returns whether an edge exists between nodes x and y without
@@ -547,7 +563,7 @@ func (g *ExprGraph) HasEdgeBetween(x, y graph.Node) bool {
 	xid := x.(*Node)
 	yid := y.(*Node)
 
-	return xid.children.Contains(yid) || yid.children.Contains(xid)
+	return xid.children.Contains(yid.id) || yid.children.Contains(xid.id)
 }
 
 // Edge returns the edge from u to v if such an edge exists and nil otherwise.
@@ -556,7 +572,7 @@ func (g *ExprGraph) Edge(u, v graph.Node) graph.Edge {
 	uid := u.(*Node)
 	vid := v.(*Node)
 
-	if !uid.children.Contains(vid) {
+	if !uid.children.Contains(vid.id) {
 		return nil
 	}
 	e := edge{from: uid, to: vid}
@@ -570,14 +586,14 @@ func (g *ExprGraph) HasEdgeFromTo(u, v graph.Node) bool {
 	uid := u.(*Node)
 	vid := v.(*Node)
 
-	return uid.children.Contains(vid)
+	return uid.children.Contains(vid.id)
 }
 
 // To returns all nodes in g that can reach directly to n.
 func (g *ExprGraph) To(n graph.Node) []graph.Node {
-	ns := g.to[n.(*Node)]
-	ns = ns.Set()
-	g.to[n.(*Node)] = ns
+	nodeIDs := g.to[n.(*Node).id]
+	ns := g.NodesFromNodeIDs(nodeIDs).Set()
+	g.to[n.(*Node).id] = nodeIDs
 	return nodeToGraphNode(ns)
 }
 
